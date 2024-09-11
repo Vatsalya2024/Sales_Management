@@ -1,16 +1,16 @@
 ﻿using System;
+using System.ComponentModel.DataAnnotations;
 
 namespace Sales_Management.Models
 {
     public class Sale
     {
-        public int Id { get; set; }
-        public string ProductName { get; set; } = string.Empty;
+        [Key]
+        public string Id { get; set; } = Guid.NewGuid().ToString();
+        public string ProductName { get; set; }
         public decimal Amount { get; set; }
         public DateTime DateOfSale { get; set; }
-        public string Status { get; set; } = string.Empty;
-
-        public int UserId { get; set; } // Foreign key
-        public User User { get; set; } = null!; // Navigation property
+        public string Status { get; set; } // "pending", "completed", "returned"
+        public string UserId { get; set; } // Foreign Key
     }
 }

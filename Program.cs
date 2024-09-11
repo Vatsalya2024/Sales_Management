@@ -9,6 +9,7 @@ using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using System.Text.Json.Serialization;
 using Sales_Management.Models;
+using System;
 
 public class Program
 {
@@ -26,7 +27,7 @@ public class Program
         builder.Services.AddEndpointsApiExplorer();
         builder.Services.AddSwaggerGen(opt =>
         {
-            opt.SwaggerDoc("v1", new OpenApiInfo { Title = "MyAPI", Version = "v1" });
+            opt.SwaggerDoc("v1", new OpenApiInfo { Title = "Sales Management API", Version = "v1" });
             opt.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
             {
                 In = ParameterLocation.Header,
@@ -53,39 +54,47 @@ public class Program
             });
         });
 
+        // Add JWT-based Authentication
         builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             .AddJwtBearer(options =>
             {
                 options.TokenValidationParameters = new TokenValidationParameters
                 {
                     ValidateIssuerSigningKey = true,
-                    IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["SecretKey"])),
+                    IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:SecretKey"])),
                     ValidateIssuer = false,
                     ValidateAudience = false
                 };
             });
 
+        // CORS Policy for React
         builder.Services.AddCors(options =>
         {
             options.AddPolicy("ReactPolicy", opts =>
             {
-                opts.WithOrigins("http://localhost:3000", "null").AllowAnyMethod().AllowAnyOrigin().AllowAnyHeader();
+                opts.WithOrigins("http://localhost:3000", "null")
+                    .AllowAnyMethod()
+                    .AllowAnyOrigin()
+                    .AllowAnyHeader();
             });
         });
 
-        builder.Services.AddDbContext<AppDbContext>(opts =>
+        // Configure Database Context (SQL Server or MySQL based on your choice)
+        builder.Services.AddDbContext<ApplicationDbContext>(opts =>
         {
             opts.UseSqlServer(builder.Configuration.GetConnectionString("LocalConnectionString"));
         });
 
-        // Register Repositories and Services
+        // Register Repositories and Services for Dependency Injection
         builder.Services.AddScoped(typeof(IRepository<,>), typeof(Repository<,>));
         builder.Services.AddScoped<IRepository<int, Sale>, Repository<int, Sale>>();
-        builder.Services.AddScoped<SaleService>();
-        builder.Services.AddScoped<UserService>();
+        builder.Services.AddScoped<IRepository<string, User>, Repository<string, User>>();
+        builder.Services.AddScoped<ISaleService, SaleService>();
+       
 
         var app = builder.Build();
 
+        // Configure the HTTP request pipeline.
         if (app.Environment.IsDevelopment())
         {
             app.UseSwagger();
@@ -95,6 +104,7 @@ public class Program
         app.UseAuthentication();
         app.UseAuthorization();
         app.UseCors("ReactPolicy");
+
         app.MapControllers();
         app.Run();
     }

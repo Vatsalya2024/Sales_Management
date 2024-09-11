@@ -1,8 +1,10 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Sales_Management.Interface;
 using Sales_Management.Models;
 using Sales_Management.Service;
 using System.Linq;
+using System.Security.Claims;
 
 namespace Sales_Management.Controllers
 {
@@ -11,103 +13,68 @@ namespace Sales_Management.Controllers
     [Authorize]
     public class SalesController : ControllerBase
     {
-        private readonly SaleService _saleService;
-        private readonly IHttpContextAccessor _httpContextAccessor;
+        private readonly ISaleService _saleService;
 
-        public SalesController(SaleService saleService, IHttpContextAccessor httpContextAccessor)
+        public SalesController(ISaleService saleService)
         {
             _saleService = saleService;
-            _httpContextAccessor = httpContextAccessor;
         }
 
         [HttpGet]
-        public IActionResult GetSales()
+        public async Task<IActionResult> GetSales()
         {
-            var userId = int.Parse(User.Claims.First(c => c.Type == "UserId").Value);
-            var userRole = User.Claims.First(c => c.Type == ClaimTypes.Role).Value;
-
-            var sales = userRole == "Admin" 
-                ? _saleService.GetAllSales() 
-                : _saleService.GetSalesByUserId(userId);
-
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            var isAdmin = User.IsInRole("Admin");
+            var sales = await _saleService.GetSalesByUser(userId, isAdmin);
             return Ok(sales);
         }
 
         [HttpGet("{id}")]
-        public IActionResult GetSale(int id)
+        public async Task<IActionResult> GetSaleById(string id)
         {
-            var sale = _saleService.GetSale(id);
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            var isAdmin = User.IsInRole("Admin");
+            var sale = await _saleService.GetSaleById(id, userId, isAdmin);
             if (sale == null)
             {
                 return NotFound();
             }
-
-            var userId = int.Parse(User.Claims.First(c => c.Type == "UserId").Value);
-            var userRole = User.Claims.First(c => c.Type == ClaimTypes.Role).Value;
-
-            if (userRole != "Admin" && sale.UserId != userId)
-            {
-                return Forbid();
-            }
-
             return Ok(sale);
         }
 
         [HttpPost]
-        public IActionResult CreateSale([FromBody] Sale sale)
+        public async Task<IActionResult> CreateSale([FromBody] Sale sale)
         {
-            var userId = int.Parse(User.Claims.First(c => c.Type == "UserId").Value);
-            var userRole = User.Claims.First(c => c.Type == ClaimTypes.Role).Value;
-
-            if (userRole != "Admin")
-            {
-                sale.UserId = userId; // Regular users can only create sales for themselves
-            }
-
-            var createdSale = _saleService.CreateSale(sale);
-            return CreatedAtAction(nameof(GetSale), new { id = createdSale.Id }, createdSale);
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            var isAdmin = User.IsInRole("Admin");
+            var createdSale = await _saleService.CreateSale(sale, userId, isAdmin);
+            return CreatedAtAction(nameof(GetSaleById), new { id = createdSale.Id }, createdSale);
         }
 
         [HttpPut("{id}")]
-        public IActionResult UpdateSale(int id, [FromBody] Sale sale)
+        public async Task<IActionResult> UpdateSale(string id, [FromBody] Sale sale)
         {
-            var existingSale = _saleService.GetSale(id);
-            if (existingSale == null)
+            sale.Id = id;
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            var isAdmin = User.IsInRole("Admin");
+            var updatedSale = await _saleService.UpdateSale(sale, userId, isAdmin);
+            if (updatedSale == null)
             {
                 return NotFound();
             }
-
-            var userId = int.Parse(User.Claims.First(c => c.Type == "UserId").Value);
-            var userRole = User.Claims.First(c => c.Type == ClaimTypes.Role).Value;
-
-            if (userRole != "Admin" && existingSale.UserId != userId)
-            {
-                return Forbid();
-            }
-
-            sale.Id = id; // Ensure the ID remains unchanged
-            _saleService.UpdateSale(sale);
-            return NoContent();
+            return Ok(updatedSale);
         }
 
         [HttpDelete("{id}")]
-        public IActionResult DeleteSale(int id)
+        public async Task<IActionResult> DeleteSale(string id)
         {
-            var existingSale = _saleService.GetSale(id);
-            if (existingSale == null)
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            var isAdmin = User.IsInRole("Admin");
+            var deletedSale = await _saleService.DeleteSale(id, userId, isAdmin);
+            if (deletedSale == null)
             {
                 return NotFound();
             }
-
-            var userId = int.Parse(User.Claims.First(c => c.Type == "UserId").Value);
-            var userRole = User.Claims.First(c => c.Type == ClaimTypes.Role).Value;
-
-            if (userRole != "Admin" && existingSale.UserId != userId)
-            {
-                return Forbid();
-            }
-
-            _saleService.DeleteSale(id);
             return NoContent();
         }
     }

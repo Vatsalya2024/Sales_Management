@@ -4,63 +4,71 @@ using Sales_Management.Models;
 
 namespace Sales_Management.Service
 {
-    public class SaleService
+    public class SaleService : ISaleService
     {
-        private readonly IRepository<int, Sale> _saleRepository;
-        private readonly UserManager<User> _userManager;
-
-        public SaleService(IRepository<int, Sale> saleRepository, UserManager<User> userManager)
+        private readonly IRepository<string, Sale> _saleRepository;
+        public SaleService(IRepository<string, Sale> saleRepository)
         {
             _saleRepository = saleRepository;
-            _userManager = userManager;
         }
 
-        public async Task<Sale?> CreateSaleAsync(Sale sale, string username)
+        public async Task<Sale> CreateSale(Sale sale, string userId, bool isAdmin)
         {
-            var user = await _userManager.FindByNameAsync(username);
-            if (user != null)
+            if (!isAdmin)
             {
-                sale.UserId = user.Id;
-                return await _saleRepository.Add(sale);
+                sale.UserId = userId;
             }
-            return null;
+            return await _saleRepository.Add(sale);
         }
 
-        public async Task<List<Sale>?> GetSalesAsync(string username, bool isAdmin)
+        public async Task<Sale?> DeleteSale(string id, string userId, bool isAdmin)
         {
+            var sale = await _saleRepository.Get(id);
+            if (sale == null || (!isAdmin && sale.UserId != userId))
+            {
+                return null;
+            }
+            return await _saleRepository.Delete(id);
+        }
+
+        public async Task<Sale?> GetSaleById(string id, string userId, bool isAdmin)
+        {
+            var sale = await _saleRepository.Get(id);
+            if (sale == null || (!isAdmin && sale.UserId != userId))
+            {
+                return null;
+            }
+            return sale;
+        }
+
+        public async Task<List<Sale>?> GetSalesByUser(string userId, bool isAdmin)
+        {
+            var allSales = await _saleRepository.GetAll();
+            if (allSales == null)
+            {
+                return null;
+            }
+
             if (isAdmin)
             {
-                return await _saleRepository.GetAll();
+                return allSales;
             }
-            else
-            {
-                var user = await _userManager.FindByNameAsync(username);
-                return user?.Sales.ToList();
-            }
+            return allSales.FindAll(sale => sale.UserId == userId);
         }
 
-        public async Task<Sale?> UpdateSaleAsync(int saleId, Sale updatedSale, string username, bool isAdmin)
+        public async Task<Sale?> UpdateSale(Sale sale, string userId, bool isAdmin)
         {
-            var sale = await _saleRepository.Get(saleId);
-            if (sale != null && (isAdmin || sale.User.Username == username))
+            var existingSale = await _saleRepository.Get(sale.Id);
+            if (existingSale == null || (!isAdmin && existingSale.UserId != userId))
             {
-                sale.ProductName = updatedSale.ProductName;
-                sale.Amount = updatedSale.Amount;
-                sale.DateOfSale = updatedSale.DateOfSale;
-                sale.Status = updatedSale.Status;
-                return await _saleRepository.Update(sale);
+                return null;
             }
-            return null;
-        }
 
-        public async Task<Sale?> DeleteSaleAsync(int saleId, string username, bool isAdmin)
-        {
-            var sale = await _saleRepository.Get(saleId);
-            if (sale != null && (isAdmin || sale.User.Username == username))
-            {
-                return await _saleRepository.Delete(saleId);
-            }
-            return null;
+            existingSale.ProductName = sale.ProductName;
+            existingSale.Amount = sale.Amount;
+            existingSale.DateOfSale = sale.DateOfSale;
+            existingSale.Status = sale.Status;
+            return await _saleRepository.Update(existingSale);
         }
     }
 
