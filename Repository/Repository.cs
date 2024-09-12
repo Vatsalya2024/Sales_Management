@@ -8,10 +8,10 @@ namespace Sales_Management.Repository
 {
     public class Repository<K, T> : IRepository<K, T> where T : class
     {
-        private readonly AppDbContext _context;
+        private readonly ApplicationDbContext _context;
         private readonly DbSet<T> _dbSet;
 
-        public Repository(AppDbContext context)
+        public Repository(ApplicationDbContext context)
         {
             _context = context;
             _dbSet = _context.Set<T>();
